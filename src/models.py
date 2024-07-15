@@ -10,7 +10,7 @@ class BasicConvClassifier(nn.Module):
         num_classes: int,
         seq_len: int,
         in_channels: int,
-        hid_dim: int = 128,                 #128から変更⇒256
+        hid_dim: int = 128,
     ) -> None:
         super().__init__()
         
@@ -23,7 +23,7 @@ class BasicConvClassifier(nn.Module):
         self.head = nn.Sequential(
             nn.AdaptiveAvgPool1d(1),
             Rearrange("b d 1 -> b d"),
-            nn.Linear(hid_dim, num_classes)                   #追加?nn.Softmax(dim=1)⇔nn.Linear(hid_dim, num_classes) 
+            nn.Linear(hid_dim, num_classes)
         )
 
     def forward(self, X: torch.Tensor) -> torch.Tensor:
