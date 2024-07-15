@@ -10,19 +10,20 @@ class BasicConvClassifier(nn.Module):
         num_classes: int,
         seq_len: int,
         in_channels: int,
-        hid_dim: int = 128
+        hid_dim: int = 128,                 #128から変更⇒256
     ) -> None:
         super().__init__()
-
+        
         self.blocks = nn.Sequential(
             ConvBlock(in_channels, hid_dim),
             ConvBlock(hid_dim, hid_dim),
+            ConvBlock(hid_dim, hid_dim),    #追加
         )
 
         self.head = nn.Sequential(
             nn.AdaptiveAvgPool1d(1),
             Rearrange("b d 1 -> b d"),
-            nn.Linear(hid_dim, num_classes),
+            nn.Linear(hid_dim, num_classes)                   #追加?nn.Softmax(dim=1)⇔nn.Linear(hid_dim, num_classes) 
         )
 
     def forward(self, X: torch.Tensor) -> torch.Tensor:
@@ -43,7 +44,7 @@ class ConvBlock(nn.Module):
         in_dim,
         out_dim,
         kernel_size: int = 3,
-        p_drop: float = 0.1,
+        p_drop: float = 0.6,        #0.1から増加
     ) -> None:
         super().__init__()
         
@@ -52,6 +53,8 @@ class ConvBlock(nn.Module):
 
         self.conv0 = nn.Conv1d(in_dim, out_dim, kernel_size, padding="same")
         self.conv1 = nn.Conv1d(out_dim, out_dim, kernel_size, padding="same")
+        torch.nn.init.kaiming_normal_(self.conv0.weight)    #Heの初期化（正規分布）
+        torch.nn.init.kaiming_normal_(self.conv1.weight)    #Heの初期化（正規分布）
         # self.conv2 = nn.Conv1d(out_dim, out_dim, kernel_size) # , padding="same")
         
         self.batchnorm0 = nn.BatchNorm1d(num_features=out_dim)
@@ -74,3 +77,22 @@ class ConvBlock(nn.Module):
         # X = F.glu(X, dim=-2)
 
         return self.dropout(X)
+    
+class SubjectLayers(nn.Module):
+    """Per subject linear layer."""
+    def __init__(self, in_channels: int, out_dim: int, n_subjects: int = 4, init_id: bool = False):
+        super().__init__()
+        self.weights = nn.Parameter(torch.randn(n_subjects, in_channels, out_dim))
+        if init_id:
+            assert in_channels == out_channels
+            self.weights.data[:] = torch.eye(in_channels)[None]
+        self.weights.data *= 1 / in_channels**0.5
+
+    def forward(self, x, subjects):
+        _, C, D = self.weights.shape
+        weights = self.weights.gather(0, subjects.view(-1, 1, 1).expand(-1, C, D))
+        return torch.einsum("bct,bcd->bdt", x, weights)
+
+    def __repr__(self):
+        S, C, D = self.weights.shape
+        return f"SubjectLayers({C}, {D}, {S})"

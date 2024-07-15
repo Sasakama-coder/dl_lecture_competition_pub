@@ -3,6 +3,10 @@ import numpy as np
 import torch
 from typing import Tuple
 from termcolor import cprint
+import torchaudio       #追加
+from torch.utils.data import Subset #追加
+#import pandas as pd     #追加
+#import scipy.stats      #追加
 
 
 class ThingsMEGDataset(torch.utils.data.Dataset):
@@ -13,7 +17,12 @@ class ThingsMEGDataset(torch.utils.data.Dataset):
         self.split = split
         self.num_classes = 1854
         
-        self.X = torch.load(os.path.join(data_dir, f"{split}_X.pt"))
+        X_ = torch.load(os.path.join(data_dir, f"{split}_X.pt"))   #self.X⇒X_pre
+        self.X = torch.nn.functional.normalize(X_, p=1.0, dim=2)
+        #self.X = torch.special.expit(self.X)
+        #X_mean = torch.mean(self.X, dim=2)
+        #X_sd = torch.std(self.X, dim=2)
+        #self.X = (self.X - X_mean)/X_sd
         self.subject_idxs = torch.load(os.path.join(data_dir, f"{split}_subject_idxs.pt"))
         
         if split in ["train", "val"]:
